@@ -1,340 +1,238 @@
-using System.Globalization;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Elements.Core;
 using FrooxEngine;
-using FrooxEngine.UIX;
 
 namespace ResoniteModLoader;
 
+/// <summary>
+/// EXPERIMENTAL:
+/// Prototype for a native DataFeed-based mod browser.
+/// The goal is to replace the Previous / Next / Open workflow
+/// with a searchable native grid/list inside the settings UI.
+/// </summary>
 [AutoRegisterSetting]
 [SettingCategory("ResoniteModLoader")]
-public sealed class ModSettings : SettingComponent<ModSettings>
+public sealed class ModSettings
+    : SettingComponent<ModSettings>
 {
     public override bool UserspaceOnly => true;
 
 #pragma warning disable CS8618
 #pragma warning disable CA1051
 
-    [SettingIndicatorProperty]
-    public readonly RawOutput<string> SelectedMod;
-
-    [SettingIndicatorProperty]
-    public readonly RawOutput<string> ModCount;
-
+    // Diese Einstellung bleibt für die Auswahl
+    // zwischen Grid und Liste erhalten.
     [SettingProperty]
-    public readonly Sync<int> SelectedIndex;
+    public readonly Sync<bool> GridView;
 
 #pragma warning restore CS8618, CA1051
 
-    [SettingProperty("Previous Mod", "")]
-    [SyncMethod(typeof(Action), [])]
-    public void PreviousMod()
-    {
-        int count = GetMods().Count;
+    // -------------------------------------------------------
+    // EXPERIMENTAL
+    //
+    // Native DataFeed entry point.
+    //
+    // The engine discovers this method through
+    // [SettingSubcategoryEnumerator] and requests
+    // DataFeedItems dynamically.
+    // -------------------------------------------------------
 
-        if (count <= 0)
+    [SettingSubcategoryEnumerator(
+        "Resonite Mods",
+        "All loaded Resonite mods")]
+    public async IAsyncEnumerable<DataFeedItem> Mods()
+    {
+        List<ResoniteModBase> mods =
+            GetMods();
+
+        List<DataFeedItem> modItems =
+            new();
+
+        foreach (ResoniteModBase mod in mods)
+        {
+            modItems.Add(
+                CreateModButton(mod));
+        }
+
+        DataFeedGroup container;
+
+        if (GridView.Value)
+        {
+            // Wird vom nativen Settings-Mapper
+            // als GridLayout dargestellt.
+            container =
+                new DataFeedGrid();
+        }
+        else
+        {
+            // Wird vom nativen Settings-Mapper
+            // als vertikale Liste dargestellt.
+            container =
+                new DataFeedGroup();
+        }
+
+        container.InitBase(
+            itemKey: "LoadedMods",
+            path: null,
+            groupingParameters: null,
+            label:
+                GridView.Value
+                    ? $"{mods.Count} Mods"
+                    : $"{mods.Count} Mods",
+            icon: null,
+            setupVisible: null,
+            setupEnabled: null,
+            subitems: modItems);
+
+        yield return container;
+
+        await Task.CompletedTask;
+    }
+
+    // -------------------------------------------------------
+    // Creates one DataFeedItem per loaded mod.
+    // -------------------------------------------------------
+
+    private static DataFeedValueAction<string>
+        CreateModButton(
+            ResoniteModBase mod)
+    {
+        DataFeedValueAction<string> item =
+            new();
+
+        string label =
+            mod.Name +
+            "\n" +
+            "★ " +
+            mod.Version +
+            "\n" +
+            mod.Author;
+
+        item.InitBase(
+            itemKey:
+                "Mod." +
+                mod.Name,
+
+            path:
+                null,
+
+            groupingParameters:
+                null,
+
+            label:
+                label,
+
+            description:
+                "Open settings for " +
+                mod.Name,
+
+            icon:
+                null,
+
+            setupVisible:
+                null,
+
+            setupEnabled:
+                null,
+
+            subitems:
+                null,
+
+            customEntity:
+                mod);
+
+        item.InitAction(
+            setupAction:
+                action =>
+                    action.ProxySettingAction<
+                        ModSettings,
+                        string>(
+                        nameof(OpenModSettings)),
+
+            value:
+                mod.Name);
+
+        return item;
+    }
+
+    // -------------------------------------------------------
+    // Opens the existing ModConfigurationView for
+    // the selected mod.
+    // -------------------------------------------------------
+
+    [SyncMethod(
+        typeof(Action<string>),
+        new string[] { })]
+    public void OpenModSettings(
+        string modName)
+    {
+        ResoniteModBase? mod =
+            GetMods()
+                .FirstOrDefault(
+                    candidate =>
+                        string.Equals(
+                            candidate.Name,
+                            modName,
+                            StringComparison.Ordinal));
+
+        if (mod == null)
+        {
+            Logger.MsgInternal(
+                "Could not find mod: " +
+                modName);
+
+            return;
+        }
+
+        World world =
+            Userspace.UserspaceWorld;
+
+        if (world == null)
             return;
 
-        SelectedIndex.Value--;
+        Slot slot =
+            world.AddSlot(
+                "Mod Settings - " +
+                mod.Name,
+                false);
 
-        if (SelectedIndex.Value < 0)
-            SelectedIndex.Value = count - 1;
+        slot.PositionInFrontOfUser(
+            new float3?(
+                float3.Backward));
 
-        UpdateSelectedMod();
+        ModConfigurationView view =
+            slot.AttachComponent<
+                ModConfigurationView>();
+
+        view.Setup(mod);
     }
 
-    [SettingProperty("Next Mod", "")]
-    [SyncMethod(typeof(Action), [])]
-    public void NextMod()
-    {
-        int count = GetMods().Count;
-
-        if (count <= 0)
-            return;
-
-        SelectedIndex.Value++;
-
-        if (SelectedIndex.Value >= count)
-            SelectedIndex.Value = 0;
-
-        UpdateSelectedMod();
-    }
-
-    [SettingProperty("Open Mod Settings", "")]
-	[SyncMethod(typeof(Action), [])]
-	public void OpenSelectedModSettings()
-	{
-		List<ResoniteModBase> mods = GetMods();
-
-		if (mods.Count == 0)
-			return;
-
-		SelectedIndex.Value =
-			MathX.Clamp(SelectedIndex.Value, 0, mods.Count - 1);
-
-		ResoniteModBase mod = mods[SelectedIndex.Value];
-
-		World world = Userspace.UserspaceWorld;
-
-		if (world == null)
-			return;
-
-		Slot slot = world.AddSlot(
-			"Mod Settings - " + mod.Name,
-			false);
-
-		slot.PositionInFrontOfUser(new float3?(float3.Backward));
-
-		ModConfigurationView view =
-			slot.AttachComponent<ModConfigurationView>();
-
-		view.Setup(mod);
-	}
-
-    protected override void OnStart()
-    {
-        base.OnStart();
-        SelectedIndex.Value = 0;
-        UpdateSelectedMod();
-    }
+    // -------------------------------------------------------
+    // Default behaviour.
+    // -------------------------------------------------------
 
     protected override void OnChanges()
     {
         base.OnChanges();
-        UpdateSelectedMod();
+
+        Logger.MsgInternal(
+            "Mod view changed. GridView=" +
+            GridView.Value);
     }
 
     public override void ResetToDefault()
     {
-        SelectedIndex.Value = 0;
-        UpdateSelectedMod();
+        GridView.Value = true;
     }
 
-    private void UpdateSelectedMod()
-    {
-        List<ResoniteModBase> mods = GetMods();
-
-        ModCount.Value =
-            mods.Count.ToString(CultureInfo.InvariantCulture);
-
-        if (mods.Count == 0)
-        {
-            SelectedMod.Value = "No mods loaded";
-            return;
-        }
-
-        if (SelectedIndex.Value < 0)
-            SelectedIndex.Value = 0;
-
-        if (SelectedIndex.Value >= mods.Count)
-            SelectedIndex.Value = mods.Count - 1;
-
-        ResoniteModBase mod = mods[SelectedIndex.Value];
-
-        SelectedMod.Value =
-            mod.Name + " " + mod.Version;
-    }
-
-    private static List<ResoniteModBase> GetMods()
+    private static List<ResoniteModBase>
+        GetMods()
     {
         return ModLoader.Mods()
-            .OrderBy(m => m.Name)
+            .OrderBy(mod => mod.Name)
             .Cast<ResoniteModBase>()
             .ToList();
-    }
-}
-
-public sealed class ModConfigurationView : Component
-{
-    private ResoniteModBase? _mod;
-    private ModConfiguration? _config;
-
-    private readonly Dictionary<ModConfigurationKey, Checkbox>
-        _boolInputs = new();
-
-    private readonly Dictionary<ModConfigurationKey, TextField>
-        _textInputs = new();
-
-    public void Setup(ResoniteModBase mod)
-    {
-        _mod = mod;
-        _config = mod.GetConfiguration();
-
-        Build();
-    }
-
-    private void Build()
-	{
-		if (_mod == null)
-			return;
-
-		UIBuilder ui = RadiantUI_Panel.SetupPanel(
-			Slot,
-			"Mod Settings: " + _mod.Name,
-			new float2(1000f, 1500f),
-			pinButton: true);
-
-		Slot.LocalScale *= 0.0005f;
-
-		RadiantUI_Constants.SetupDefaultStyle(ui);
-
-		ui.VerticalLayout(4f);
-
-		ui.Style.MinHeight = 1050f;
-		ui.Style.PreferredHeight = 1050f;
-
-		ui.ScrollArea();
-
-		ui.VerticalLayout(
-			6f,
-			8f,
-			Alignment.TopLeft,
-			true,
-			false);
-
-		ui.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
-
-		ui.Style.MinHeight = 32f;
-		ui.Style.PreferredHeight = 32f;
-
-		ui.Text("Mod: " + _mod.Name + " " + _mod.Version);
-		ui.Text("Author: " + _mod.Author);
-		ui.Text($"Settings: {_config?.ConfigurationItemDefinitions.Count ?? 0}");
-		ui.Text("");
-
-		if (_config == null)
-		{
-			ui.Text("This mod has no configuration.");
-			return;
-		}
-
-		foreach (ModConfigurationKey key in
-				_config.ConfigurationItemDefinitions
-					.Where(k => !k.InternalAccessOnly)
-					.OrderBy(k => k.Name))
-		{
-			AddSetting(ui, key);
-		}
-
-		ui.NestOut();
-
-		ui.Style.MinHeight = 50f;
-		ui.Style.PreferredHeight = 50f;
-
-		Button save = ui.Button((LocaleString)"Save Settings");
-		save.Pressed.Target = SaveSettings;
-
-		Button close = ui.Button((LocaleString)"Close");
-		close.Pressed.Target = Close;
-	}
-
-    private void AddSetting(
-		UIBuilder ui,
-		ModConfigurationKey key)
-	{
-		if (_config == null)
-			return;
-
-		Type type = key.ValueType();
-		object? value = GetValueOrDefault(key);
-
-		ui.Style.MinHeight = 32f;
-		ui.Style.PreferredHeight = 32f;
-
-		LocaleString label = (LocaleString)key.Name;
-
-		if (type == typeof(bool))
-		{
-			_boolInputs[key] =
-				ui.HorizontalElementWithLabel(
-					label,
-					0.7f,
-					() => ui.Checkbox(value is bool b && b));
-
-			return;
-		}
-
-		_textInputs[key] =
-			ui.HorizontalElementWithLabel(
-				label,
-				0.35f,
-				() => ui.TextField(value?.ToString() ?? ""));
-	}
-
-    [SyncMethod(typeof(ButtonEventHandler), new string[] { })]
-    public void SaveSettings(
-        IButton button,
-        ButtonEventData eventData)
-    {
-        if (_mod == null || _config == null)
-            return;
-
-        foreach (var pair in _boolInputs)
-        {
-            _config.Set(pair.Key, pair.Value.IsChecked);
-        }
-
-        foreach (var pair in _textInputs)
-        {
-            ModConfigurationKey key = pair.Key;
-            TextField field = pair.Value;
-
-            string text = field.TargetString ?? "";
-
-            try
-			{
-				object parsed = ParseValue(key.ValueType(), text);
-				_config.Set(key, parsed);
-			}
-			catch (Exception ex)
-			{
-				UniLog.Warning(
-					$"Failed to parse '{key.Name}': {ex.Message}");
-			}
-        }
-
-        _config.Save();
-
-        Logger.MsgInternal(
-            "Saved mod settings: " + _mod.Name);
-    }
-
-    [SyncMethod(typeof(ButtonEventHandler), new string[] { })]
-    public void Close(
-        IButton button,
-        ButtonEventData eventData)
-    {
-        Slot.Destroy();
-    }
-
-    private object? GetValueOrDefault(ModConfigurationKey key)
-    {
-        if (_config == null)
-            return null;
-
-        try
-        {
-            return _config.GetValue(key);
-        }
-        catch
-        {
-            key.TryComputeDefault(out object? value);
-            return value;
-        }
-    }
-
-    private static object ParseValue(Type type, string text)
-    {
-        return type switch
-		{
-			_ when type == typeof(string) => text,
-			_ when type == typeof(int) => int.Parse(text, CultureInfo.InvariantCulture),
-			_ when type == typeof(float) => float.Parse(text, CultureInfo.InvariantCulture),
-			_ when type == typeof(double) => double.Parse(text, CultureInfo.InvariantCulture),
-			_ when type == typeof(long) => long.Parse(text, CultureInfo.InvariantCulture),
-			_ when type == typeof(short) => short.Parse(text, CultureInfo.InvariantCulture),
-			_ when type == typeof(byte) => byte.Parse(text, CultureInfo.InvariantCulture),
-			_ when type.IsEnum => Enum.Parse(type, text, true),
-			_ => text
-		};
     }
 }
