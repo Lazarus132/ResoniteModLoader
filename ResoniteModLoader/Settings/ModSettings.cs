@@ -27,6 +27,9 @@ public sealed class ModSettings
     [SettingProperty]
     public readonly Sync<bool> GridView;
 
+    [SettingProperty]
+    public readonly Sync<string> SearchText;
+
 #pragma warning restore CS8618, CA1051
 
     // -------------------------------------------------------
@@ -47,46 +50,51 @@ public sealed class ModSettings
         List<ResoniteModBase> mods =
             GetMods();
 
-        List<DataFeedItem> modItems =
-            new();
+        string filter =
+            (SearchText.Value ?? "").Trim();
 
-        foreach (ResoniteModBase mod in mods)
-        {
-            modItems.Add(
-                CreateModButton(mod));
-        }
-
-        DataFeedGroup container;
-
-        if (GridView.Value)
-        {
-            // Wird vom nativen Settings-Mapper
-            // als GridLayout dargestellt.
-            container =
-                new DataFeedGrid();
-        }
-        else
-        {
-            // Wird vom nativen Settings-Mapper
-            // als vertikale Liste dargestellt.
-            container =
-                new DataFeedGroup();
-        }
+        DataFeedGroup container =
+            GridView.Value
+                ? new DataFeedGrid()
+                : new DataFeedGroup();
 
         container.InitBase(
             itemKey: "LoadedMods",
             path: null,
             groupingParameters: null,
-            label:
-                GridView.Value
-                    ? $"{mods.Count} Mods"
-                    : $"{mods.Count} Mods",
+            label: $"{mods.Count} Mods",
             icon: null,
             setupVisible: null,
             setupEnabled: null,
-            subitems: modItems);
+            subitems: null);
 
+        // ZUERST den Grid-Container ausgeben
         yield return container;
+
+        // Danach Gruppierung erzeugen
+        string[] grouping =
+        {
+            container.ItemKey
+        };
+
+        // Jetzt alle Mods einzeln ausgeben
+        foreach (ResoniteModBase mod in mods)
+        {
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                bool match =
+                    mod.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                    || mod.Author.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                    || mod.Version.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
+                if (!match)
+                    continue;
+            }
+
+            yield return CreateModButton(
+                mod,
+                grouping);
+        }
 
         await Task.CompletedTask;
     }
@@ -97,7 +105,8 @@ public sealed class ModSettings
 
     private static DataFeedValueAction<string>
         CreateModButton(
-            ResoniteModBase mod)
+            ResoniteModBase mod,
+            string[] grouping)
     {
         DataFeedValueAction<string> item =
             new();
@@ -119,7 +128,7 @@ public sealed class ModSettings
                 null,
 
             groupingParameters:
-                null,
+                grouping,
 
             label:
                 label,
@@ -218,8 +227,7 @@ public sealed class ModSettings
         base.OnChanges();
 
         Logger.MsgInternal(
-            "Mod view changed. GridView=" +
-            GridView.Value);
+            $"Grid={GridView.Value}, Search=\"{SearchText.Value}\"");
     }
 
     public override void ResetToDefault()
