@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <AssemblyTitle>ResoniteModLoader.DataFeedPatches</AssemblyTitle>
+    <AssemblyProduct>$(AssemblyTitle)</AssemblyProduct>
+
+    <PackageId>$(AssemblyTitle)</PackageId>
+
+    <Version>1.0.0</Version>
+
+    <CopyToRmlLibs Condition="'$(CopyToRmlLibs)'==''">
+      true
+    </CopyToRmlLibs>
+  </PropertyGroup>
+
+  <ItemGroup>
+
+    <ProjectReference
+        Include="..\ResoniteModLoader\ResoniteModLoader.csproj"
+        Private="false" />
+
+    <PackageReference
+        Include="Lib.Harmony"
+        Version="2.4.2" />
+
+    <Reference Include="FrooxEngine">
+      <HintPath>$(ResonitePath)FrooxEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <Reference Include="Elements.Core">
+      <HintPath>$(ResonitePath)Elements.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <Reference Include="Renderite.Shared">
+      <HintPath>$(ResonitePath)Renderite.Shared.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+  </ItemGroup>
+
+  <Target
+      Name="CopyToRmlLibs"
+      AfterTargets="Build">
+
+      <Message
+          Text="=============================="
+          Importance="high"/>
+
+      <Message
+          Text="TargetDir=$(TargetDir)"
+          Importance="high"/>
+
+      <Message
+          Text="ResonitePath=$(ResonitePath)"
+          Importance="high"/>
+
+      <Message
+          Text="Copying $(TargetFileName)"
+          Importance="high"/>
+
+      <Copy
+          SourceFiles="$(TargetDir)$(TargetFileName)"
+          DestinationFolder="$(ResonitePath)rml_libs"/>
+  </Target>
+
+</Project>
