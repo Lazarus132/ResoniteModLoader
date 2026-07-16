@@ -9,16 +9,27 @@ public sealed class ModConfigurationView : Component
 {
     private ResoniteModBase? _mod;
     private ModConfiguration? _config;
+    private const float FooterHeight = 64f;
+    private const float SaveButtonTextSize  = 24f;
+    private const float ContentPadding = 24f;
+    private const float SettingHeight = 32f;
+    private const float InnerPadding = 8f;
+    private const float SettingSpacing = 6f;
+    private readonly Dictionary<ModConfigurationKey, Checkbox> _boolInputs = new();
+    private readonly Dictionary<ModConfigurationKey, IValueEditor> _editors = new();
+    private readonly Dictionary<IButton, IButtonValueEditor> _editorButtonOwners = new();
 
-    private readonly Dictionary<ModConfigurationKey, Checkbox>
-        _boolInputs = new();
-
-    private readonly Dictionary<ModConfigurationKey, TextField>
-        _textInputs = new();
+    private static void ApplySettingHeight(UIBuilder ui)
+    {
+        ui.Style.MinHeight = SettingHeight;
+        ui.Style.PreferredHeight = SettingHeight;
+        ui.Style.FlexibleHeight = -1f;
+    }
 
     public void Setup(ResoniteModBase mod)
     {
         _mod = mod;
+
         _config = mod.GetConfiguration();
 
         Build();
@@ -26,55 +37,53 @@ public sealed class ModConfigurationView : Component
 
     private void Build()
     {
-        if (_mod == null)
-            return;
+        if (_mod == null) return;
 
-        UIBuilder ui = RadiantUI_Panel.SetupPanel(
-            Slot,
-            "Mod Settings: " + _mod.Name,
-            new float2(1000f, 1500f),
-            pinButton: true);
+        Slot.DestroyChildren();
+        _boolInputs.Clear();
+        _editors.Clear();
+        _editorButtonOwners.Clear();
 
-        Slot.LocalScale *= 0.0005f;
+        UIBuilder ui = new UIBuilder(Slot);
 
         RadiantUI_Constants.SetupDefaultStyle(ui);
 
-        ui.VerticalLayout(4f);
+        /*
+        * WICHTIG:
+        *
+        * Hier KEIN äußeres VerticalLayout erzeugen.
+        *
+        * HorizontalFooter arbeitet direkt mit RectTransform-Ankern
+        * und teilt den gesamten verfügbaren Bereich sauber in:
+        *
+        * ├─ Content
+        * └─ Footer
+        */
+        ui.HorizontalFooter(FooterHeight,
+            out RectTransform footer,
+            out RectTransform content);
 
-        ui.Style.MinHeight = 1050f;
-        ui.Style.PreferredHeight = 1050f;
+        /*
+        * ==========================================================
+        * SETTINGS-CONTENT
+        * ==========================================================
+        */
 
-        ui.ScrollArea();
+        ui.NestInto(content);
+
+        content.AddFixedPadding(ContentPadding);
+
+        ui.ScrollArea(Alignment.TopLeft);
 
         ui.VerticalLayout(
-            6f,
-            8f,
-            Alignment.TopLeft,
-            true,
-            false);
+            spacing: SettingSpacing,
+            padding: InnerPadding,
+            childAlignment: Alignment.TopLeft,
+            forceExpandWidth: true,
+            forceExpandHeight: false);
 
-        ui.FitContent(
-            SizeFit.Disabled,
-            SizeFit.PreferredSize);
-
-        ui.Style.MinHeight = 32f;
-        ui.Style.PreferredHeight = 32f;
-
-        ui.Text(
-            "Mod: " +
-            _mod.Name +
-            " " +
-            _mod.Version);
-
-        ui.Text(
-            "Author: " +
-            _mod.Author);
-
-        ui.Text(
-            $"Settings: " +
-            $"{_config?.ConfigurationItemDefinitions.Count ?? 0}");
-
-        ui.Text("");
+        ui.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
+        ApplySettingHeight(ui);
 
         if (_config == null)
         {
@@ -83,123 +92,151 @@ public sealed class ModConfigurationView : Component
         }
 
         foreach (ModConfigurationKey key in
-                 _config.ConfigurationItemDefinitions
-                     .Where(k => !k.InternalAccessOnly)
-                     .OrderBy(k => k.Name))
+            _config.ConfigurationItemDefinitions
+                .Where(key => !key.InternalAccessOnly)
+                .OrderBy(key => key.Name))
         {
             AddSetting(ui, key);
         }
 
+        /*
+        * ==========================================================
+        * FOOTER
+        * ==========================================================
+        */
+
+        footer.AddFixedPadding(InnerPadding);
+
+        ui.ForceNext = footer;
+
+        RectTransform footerPanel = ui.Panel();
+
+        footerPanel.AddProportionalPadding(
+            left: 0.25f,
+            top: 0f,
+            right: 0.25f,
+            bottom: 0f);
+
+        ui.Style.MinHeight = -1f;
+        ui.Style.PreferredHeight = -1f;
+        ui.Style.FlexibleHeight = -1f;
+
+        Button save = ui.Button((LocaleString)"Save Settings");
+
+        save.Label.Size.Value = SaveButtonTextSize;
+        save.Pressed.Target = SaveSettings;
+
         ui.NestOut();
-
-        ui.Style.MinHeight = 32f;
-        ui.Style.PreferredHeight = 32f;
-
-        Button save =
-            ui.Button(
-                (LocaleString)"Save Settings");
-
-        save.Pressed.Target =
-            SaveSettings;
     }
 
     private void AddSetting(
         UIBuilder ui,
         ModConfigurationKey key)
     {
-        if (_config == null)
-            return;
+        if (_config == null) return;
 
-        Type type =
-            key.ValueType();
+        Type type = key.ValueType();
 
-        object? value =
-            GetValueOrDefault(key);
+        object? value = GetValueOrDefault(key);
 
-        ui.Style.MinHeight = 32f;
-        ui.Style.PreferredHeight = 32f;
+        ApplySettingHeight(ui);
 
-        LocaleString label =
-            (LocaleString)key.Name;
+        LocaleString label = (LocaleString)key.Name;
 
         if (type == typeof(bool))
         {
             _boolInputs[key] =
                 ui.HorizontalElementWithLabel(
-                    label,
-                    0.7f,
-                    () => ui.Checkbox(
-                        value is bool b && b));
-
+                    label, 0.7f, () => ui.Checkbox(
+                        value is bool boolValue && boolValue));
             return;
         }
 
-        _textInputs[key] =
-            ui.HorizontalElementWithLabel(
-                label,
-                0.35f,
-                () => ui.TextField(
-                    value?.ToString() ?? ""));
+        IValueEditor editor = EditorRegistry.GetEditor(type);
+
+        string serializedValue = ValueSerializer.Serialize(value);
+
+        editor.SetSerializedValue(serializedValue);
+
+        ui.HorizontalElementWithLabel(label, 0.35f, () => editor.Build(ui));
+
+        _editors[key] = editor;
+
+        if (editor is
+            IButtonValueEditor buttonEditor)
+        {
+            foreach (Button editorButton in buttonEditor.EditorButtons)
+            {
+                editorButton.Pressed.Target = HandleEditorButton;
+                _editorButtonOwners[editorButton] = buttonEditor;
+            }
+        }
     }
 
-    [SyncMethod(
-        typeof(ButtonEventHandler),
-        new string[] { })]
+    [SyncMethod(typeof(ButtonEventHandler), new string[] { })]
+    public void HandleEditorButton(
+        IButton button,
+        ButtonEventData eventData)
+    {
+        if (_editorButtonOwners.TryGetValue(button, out IButtonValueEditor? editor))
+        {
+            editor.HandleButton(button);
+        }
+    }
+
+    [SyncMethod(typeof(ButtonEventHandler), new string[] { })]
     public void SaveSettings(
         IButton button,
         ButtonEventData eventData)
     {
-        if (_mod == null || _config == null)
-            return;
+        if (_mod == null || _config == null || 
+            (_editors.Count == 0 && 
+                _boolInputs.Count == 0)) return;
 
         foreach (var pair in _boolInputs)
         {
-            _config.Set(
-                pair.Key,
-                pair.Value.IsChecked);
+            _config.Set(pair.Key, pair.Value.IsChecked);
         }
 
-        foreach (var pair in _textInputs)
+        foreach (var pair in _editors)
         {
-            ModConfigurationKey key =
-                pair.Key;
+            ModConfigurationKey key = pair.Key;
 
-            TextField field =
-                pair.Value;
+            IValueEditor editor = pair.Value;
 
-            string text =
-                field.TargetString ?? "";
+            string serializedValue = editor.SerializedValue;
 
             try
             {
-                object parsed =
+                object parsedValue =
                     ParseValue(
                         key.ValueType(),
-                        text);
+                        serializedValue);
 
-                _config.Set(
-                    key,
-                    parsed);
+                _config.Set(key, parsedValue);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 UniLog.Warning(
-                    $"Failed to parse '{key.Name}': {ex.Message}");
+                    $"Failed to parse " +
+                    $"'{key.Name}': " +
+                    exception.Message);
             }
         }
-
-        _config.Save();
-
-        Logger.MsgInternal(
-            "Saved mod settings: " +
-            _mod.Name);
+        try
+        {
+            _config.Save();
+        }
+        catch (Exception ex)
+        {
+            UniLog.Error($"Failed to save configuration: {ex}");
+        }
     }
 
     private object? GetValueOrDefault(
         ModConfigurationKey key)
     {
-        if (_config == null)
-            return null;
+        if (_config == null) return null;
 
         try
         {
@@ -207,9 +244,7 @@ public sealed class ModConfigurationView : Component
         }
         catch
         {
-            key.TryComputeDefault(
-                out object? value);
-
+            key.TryComputeDefault(out object? value);
             return value;
         }
     }
@@ -220,46 +255,16 @@ public sealed class ModConfigurationView : Component
     {
         return type switch
         {
-            _ when type == typeof(string) =>
-                text,
-
-            _ when type == typeof(int) =>
-                int.Parse(
-                    text,
-                    CultureInfo.InvariantCulture),
-
-            _ when type == typeof(float) =>
-                float.Parse(
-                    text,
-                    CultureInfo.InvariantCulture),
-
-            _ when type == typeof(double) =>
-                double.Parse(
-                    text,
-                    CultureInfo.InvariantCulture),
-
-            _ when type == typeof(long) =>
-                long.Parse(
-                    text,
-                    CultureInfo.InvariantCulture),
-
-            _ when type == typeof(short) =>
-                short.Parse(
-                    text,
-                    CultureInfo.InvariantCulture),
-
-            _ when type == typeof(byte) =>
-                byte.Parse(
-                    text,
-                    CultureInfo.InvariantCulture),
-
-            _ when type.IsEnum =>
-                Enum.Parse(
-                    type,
-                    text,
-                    true),
-
-            _ => text
+            _ when type == typeof(colorX) => ValueSerializer.Deserialize(type, text),
+            _ when type == typeof(string) => text,
+            _ when type == typeof(int) => int.Parse(text, CultureInfo.InvariantCulture),
+            _ when type == typeof(float) => float.Parse(text, CultureInfo.InvariantCulture),
+            _ when type == typeof(double) => double.Parse(text, CultureInfo.InvariantCulture),
+            _ when type == typeof(long) => long.Parse(text, CultureInfo.InvariantCulture),
+            _ when type == typeof(short) => short.Parse(text, CultureInfo.InvariantCulture),
+            _ when type == typeof(byte) => byte.Parse(text, CultureInfo.InvariantCulture),
+            _ when type.IsEnum => Enum.Parse(type, text, true),
+            _ => ValueSerializer.Deserialize(type, text)
         };
     }
 }

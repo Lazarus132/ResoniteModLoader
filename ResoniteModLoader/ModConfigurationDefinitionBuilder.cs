@@ -67,6 +67,12 @@ public class ModConfigurationDefinitionBuilder {
 		}
 
 		if (field.GetValue(field.IsStatic ? null : Owner) is ModConfigurationKey fieldValue) {
+			Logger.MsgInternal(
+				$"REGISTER CONFIG: {Owner.Name} | " +
+				$"{field.Name} | " +
+				$"{field.FieldType.FullName} | " +
+				$"{fieldValue.Name} | " +
+				$"{fieldValue.ValueType().FullName}");
 			Keys.Add(fieldValue);
 		}
 	}

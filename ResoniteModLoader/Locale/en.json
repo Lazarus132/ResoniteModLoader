@@ -30,6 +30,14 @@
 		"Settings.ModSettings.ShowAll": "Show all mods",
 		"Settings.ModSettings.ShowAll.Description": "Show all entries for mods, including ones with no settings.",
 
+		"Settings.ModSettings.ButtonColor": "Button Color",
+		"Settings.ModSettings.ButtonHoverColor": "Button Hover Color",
+		"Settings.ModSettings.ButtonPressedColor": "Button Pressed Color",
+
+		"Settings.ModSettings.ButtonColor.Description": "Color of the mod buttons",
+		"Settings.ModSettings.ButtonHoverColor.Description": "Hover color of the mod buttons",
+		"Settings.ModSettings.ButtonPressedColor.Description": "Pressed color of the mod buttons",
+
 		"Dummy": "Dummy"
 	}
 }

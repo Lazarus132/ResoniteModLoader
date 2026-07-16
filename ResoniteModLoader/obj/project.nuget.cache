@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "nn5Uu7Iagdg=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\schad\\Desktop\\ResoniteModLoader-5.0.1\\ResoniteModLoader-5.0.1\\ResoniteModLoader\\ResoniteModLoader.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\schad\\.nuget\\packages\\lib.harmony\\2.4.2\\lib.harmony.2.4.2.nupkg.sha512"
+  ],
+  "logs": []
+}

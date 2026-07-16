@@ -1,0 +1,14 @@
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\bin\Release\net10.0\ResoniteModLoader.deps.json
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\bin\Release\net10.0\ResoniteModLoader.dll
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\bin\Release\net10.0\ResoniteModLoader.pdb
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\bin\Release\net10.0\ResoniteModLoader.xml
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.csproj.AssemblyReference.cache
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.AssemblyInfoInputs.cache
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.AssemblyInfo.cs
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.csproj.CoreCompileInputs.cache
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.dll
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\refint\ResoniteModLoader.dll
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.xml
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ResoniteModLoader.pdb
+C:\Users\schad\Desktop\ResoniteModLoader-5.0.1\ResoniteModLoader-5.0.1\ResoniteModLoader\obj\Release\net10.0\ref\ResoniteModLoader.dll
